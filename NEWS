@@ -1,0 +1,19 @@
+BSmooth-align NEWS
+==================
+
+BSmooth-align is now available for download from:
+
+http://rafalab.jhsph.edu/bsmooth/
+
+0.8.0 was the first version uploaded to GitHub.  BSmooth is licensed under the
+GPLv3 license.  See `LICENSE' file for details.
+
+Version Release History
+=======================
+
+Version 0.8.0 - December 19, 2012
+   * Update author's email.
+   * Running library unit tests no longer requires Perl module IO::String.
+   * Fixed a couple spurious warnings printed in the BtlBio libraries.
+   * Fixed a couple issues whereby commands issued to bowtie2 would not use
+     proper arguments resulting in warnings.

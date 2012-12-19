@@ -1,0 +1,5 @@
+This directory contains a scripts that moves through an example (Makefile),
+which uses sim.pl to create a small, simulated dataset.  It move through all
+the pipeline stages described in the top-level README.
+
+You must have BSMOOTH_HOME set appropriately to run this example.

@@ -25,7 +25,7 @@ cp -r ../../test .
 # Copy docs
 cp ../../README .
 cp ../../NEWS .
-cp ../../COPYING .
+cp ../../LICENSE .
 cp ../../VERSION .
 
 svn co svn+ssh://langmead@ibissub00.umiacs.umd.edu/fs/szdevel/src/svnroot/merman/trunk merman_trunk

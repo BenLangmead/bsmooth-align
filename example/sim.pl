@@ -13,7 +13,6 @@
 
 use strict;
 use warnings;
-use Math::Random qw(random_normal);
 
 my %revcompMap = (
 	"A" => "T",
@@ -70,7 +69,12 @@ my $nreads = 200;
 my $rdlen = 100;
 my $frag_av = 300;
 my $frag_sd = 25;
-my @fraglens = random_normal($nreads, $frag_av, $frag_sd);
+my @fraglens = ();
+for(my $i = 0; $i < $nreads; $i++) {
+	my $ln = $frag_av;
+	my $ad = int(rand() * (4 * $frag_sd)) - int(2 * $frag_sd);
+	push @fraglens, $ln + $ad;
+}
 
 open(RD1, ">reads_1.fq") || die;
 open(RD2, ">reads_2.fq") || die;

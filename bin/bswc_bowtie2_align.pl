@@ -303,8 +303,8 @@ sub run($) {
 		my $ad = "";
 		$ad = "(core dumped)" if (($? & 128) != 0);
 	    confess(sprintf "'$cmd' died with signal %d (%s) $ad", ($? & 127), $signm);
-	} else {
-	    confess("'$cmd' exited with value %d", $? >> 8);
+	} elsif($? != 0) {
+	    confess(sprintf "'$cmd' exited with value %d", $? >> 8);
 	}
 }
 

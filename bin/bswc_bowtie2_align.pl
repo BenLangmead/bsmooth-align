@@ -797,6 +797,8 @@ sub select_al($$$) {
 	my @strands = ();
 	my $max_mapq = -1;
 	my $n = 0;
+	# Scan alignments, recording maximum mapping quality as we go.  Also, keep
+	# track of all alignments that are "tied" for best mapping quality.
 	for my $i (0..scalar(@$als)-1) {
 		$n++;
 		my $mapq = $als->[$i]->[0]->{_mapq};
@@ -805,8 +807,7 @@ sub select_al($$$) {
 			@max_mapq_l = ($i);
 			$max_mapq = $mapq;
 		} elsif($mapq == $max_mapq) {
-			# Tied - we'll select randomly later
-			push @max_mapq_l, $i;
+			push @max_mapq_l, $i; # Tied - we'll select randomly later
 		}
 	}
 	my $seli = int(rand(scalar(@max_mapq_l)));
@@ -816,19 +817,25 @@ sub select_al($$$) {
 	if($strand4 && $n == 2) {
 		# Check for the special case where the read aligns to W and CR or to C
 		# and WR, in which case the ambiguity may be due to the read being
-		# highly methylated.  We could further confirm this by seeing if the
-		# two alignments are in corresponding spots.  We might report "strand
-		# MAPQ" as a separate number.
+		# highly methylated.
+		#
+		# TODO: We should further confirm this by seeing if the two alignments
+		# are in corresponding spots.  We might report "strand MAPQ" as a
+		# separate number.
 		my $fw1 = (substr($als->[0]->[0]->{_rdname}, -1) eq "+") ? 1 :0;
 		my $fw2 = (substr($als->[1]->[0]->{_rdname}, -1) eq "+") ? 1 : 0;
 		if($fw1 != $fw2 && $wats->[0] != $wats->[1]) {
 			$new_mapq1 = int($als->[$seli]->[0]->{_mapq} * 2.0 / 3.0);
 			$new_mapq2 = int($als->[$seli]->[1]->{_mapq} * 2.0 / 3.0) if $paired;
 		} else {
+			# TODO: This is rather conservative.  See next comment.
 			$new_mapq1 = 0;
 			$new_mapq2 = 0 if $paired;
 		}
 	} elsif($n > 1) {
+		# TODO: This is rather conservative.  Really we'd like to re-estimate
+		# mapping quality at this point, instead of assuming that it's very low
+		# just because the read aligned in more than one orientation.
 		$new_mapq1 = 0;
 		$new_mapq2 = 0 if $paired;
 	}
@@ -1079,8 +1086,6 @@ while(1) {
 				# Select alignment with greatest MAPQ
 				my ($seli, $nmapq1, $nmapq2) = select_al(\@als, \@is_watson, $strand4);
 				$al = $als[$seli];
-				$nmapq1 <= $al->[0]{_mapq} || die;
-				if($al_paired) { $nmapq2 <= $al->[1]{_mapq} || die; }
 				$al->[0]{_mapq} = $nmapq1;
 				$al->[1]{_mapq} = $nmapq2 if $al_paired;
 				if($bsc) {
@@ -1209,8 +1214,6 @@ while(1) {
 				# Select alignment with greatest MAPQ
 				my ($seli, $nmapq1, $nmapq2) = select_al(\@als, \@is_watson, $strand4);
 				$al = $als[$seli];
-				$nmapq1 <= $al->[0]{_mapq} || die;
-				if($al_paired) { $nmapq2 <= $al->[1]{_mapq} || die; }
 				$al->[0]{_mapq} = $nmapq1;
 				$al->[1]{_mapq} = $nmapq2 if $al_paired;
 				# TODO: Be careful here: when the read aligns both to W and CR,

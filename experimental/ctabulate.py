@@ -18,6 +18,7 @@ import random
 import copy
 import site
 import errno
+import reference
 
 base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 pytrim_path = os.path.join(base_path, "modules", "btl")
@@ -91,7 +92,6 @@ _revcomp_trans = string.maketrans("ACGTacgt", "TGCAtgca")
 def revcomp(_x):
     return _x[::-1].translate(_revcomp_trans)
 
-import FastaSeqIdx
 import WeightedRandom
 
 
@@ -608,7 +608,7 @@ if args.loci is None and args.rand_loci is None:
 
 # Open the FASTA files in 
 print >> sys.stderr, 'Parsing FASTA files...'
-fa_idx = FastaSeqIdx.FastaSeqIdx(args.fasta, truncate=True, idx_fn=args.fa_idx)
+fa_idx = reference.ReferenceSimple(args.fasta)
 fa_sanity = dict()
 if args.sanity:
     from Bio import SeqIO

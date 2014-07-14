@@ -445,7 +445,10 @@ def tab_ival(off,
              filt_rdl=lambda _: False,
              sanity=False,
              verbose=False):
-    
+
+    # TODO: is the purpose of the padding just so we don't miss a CpG
+    # at the edge of a substring?  Does the padding ever need to be >1?
+
     """ For each CpG (and possibly each C) locus, tabulate the read-level
         measurements overlapping the locus.
         
@@ -460,20 +463,27 @@ def tab_ival(off,
         - 
         """
 
-    refstr = fa_get(off - npad, off + ln + npad)
-    assert len(refstr) == ln + 1 + 2 * npad
-    
+    # need a clear expectation about what this function should do if
+    # our requested bounds fall off the end of the reference sequence.
+    refstr, lpad, rpad = fa_get(off, ln, npad, npad)
+    assert lpad <= npad
+    assert rpad <= npad
+    assert len(refstr) == ln + lpad + rpad
+    if lpad < npad:
+        refstr = ('x' * (npad - lpad)) + refstr
+    if rpad < npad:
+        refstr += ('x' * (npad - lpad))
+    assert len(refstr) == ln + 2 * npad
+
     # Now calculate bisulfite strings
     refstr_wat = refstr.replace('CG', 'YG')
     refstr_wat = refstr_wat.replace('C', 'T' if just_cpg else 'Y')
     refstr_cri = refstr.replace('CG', 'CR')
     refstr_cri = refstr_cri.replace('G', 'A' if just_cpg else 'R')
-    assert len(refstr_wat) == len(refstr)
-    assert len(refstr_cri) == len(refstr)
     refstr_trimmed, refstr_wat, refstr_cri = \
         refstr[npad:len(refstr)-npad], \
-        refstr_wat[npad:len(refstr)-npad], \
-        refstr_cri[npad:len(refstr)-npad]
+        refstr_wat[npad:len(refstr_wat)-npad], \
+        refstr_cri[npad:len(refstr_cri)-npad]
     
     # Multi-alignment is a dictionary mapping reference offsets to lists.
     # Each list is a list of strings, where each string is either empty,
@@ -587,10 +597,12 @@ class TestTabIval(unittest.TestCase):
         rdseq = "AGCATGCAACT"
         rdqual = "IIIIIIIIIII"
         recs = [(pos, flag, wat, not fw, cigars, alsc, mapq, rdseq, rdqual)]
-        summ, summs_fw, summs_rc = tab_ival(1, 9, lambda _x, y: recs, lambda _x, y: refseq[_x:_x+y], 0, True)
+        summ, summs_fw, summs_rc = tab_ival(1, 9, lambda _x, y: recs,
+                                            lambda _x, _y, _lpad, _rpad: (refseq[_x:_x+_y], 0, 0), 0, True)
         self.assertEqual(0, len(summs_fw.keys()))
         self.assertEqual(0, len(summs_rc.keys()))
-        summ, summs_fw, summs_rc = tab_ival(1, 9, lambda _x, y: recs, lambda _x, y: refseq[_x:_x+y], 0, False)
+        summ, summs_fw, summs_rc = tab_ival(1, 9, lambda _x, y: recs,
+                                            lambda _x, _y, _lpad, _rpad: (refseq[_x:_x+_y], 0, 0), 0, False)
         self.assertEqual(3, len(summs_fw.keys()))
         self.assertEqual(2, len(summs_rc.keys()))
 
@@ -681,7 +693,7 @@ def go():
             summ, summs_fw, summs_rc = \
                 tab_ival(off1, ln,
                          lambda _x, _y: aln_get(ch, _x, _y),
-                         lambda _x, _y: fa_idx.getpad(ch, _x, _y-_x, 'x'),
+                         lambda _x, _y, _lpad, _rpad: fa_idx.get(ch, _x, _y-_x, _lpad, _rpad),
                          fa_idx.length(ch),
                          filt_mapq=lambda _x: _x < args.min_mapq,
                          filt_rdl=lambda _x: _x < args.min_rdl,
@@ -718,7 +730,7 @@ def go():
                 summ, summs_fw, summs_rc = \
                     tab_ival(off, mylen,
                              lambda _x, _y: aln_get(ch, _x, _y),
-                             lambda _x, _y: seq_pad[_x+npad:_y+npad],
+                             lambda _x, _y, _lpad, _rpad: seq_pad[_x+npad:_y+npad],
                              fa_idx.length(ch),
                              filt_mapq=lambda _x: _x < args.min_mapq,
                              filt_rdl=lambda _x: _x < args.min_rdl,

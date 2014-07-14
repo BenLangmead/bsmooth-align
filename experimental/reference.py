@@ -176,12 +176,19 @@ class ReferenceSimple(Reference):
     def length(self, refid):
         return self.lens[refid]
 
-    def get(self, refid, pos, ln):
+    def get(self, refid, pos, ln, lpad, rpad):
         """ Return the specified substring of the reference """
         assert refid in self.refs
+        left, right = pos - lpad, pos + ln + rpad
         if pos + ln > self.lens[refid]:
-            raise ReferenceOOB('"%s" has length %d; tried to get [%d, %d)' % (refid, self.lens[refid], pos, pos+ln))
-        return self.refs[refid][pos:pos+ln]
+            raise RuntimeError('pos+ln=%d, len=%d' % (pos+ln, self.lens[refid]))
+        if pos < 0:
+            raise RuntimeError('pos=%d' % pos)
+        if right > self.lens[refid]:
+            rpad -= (right - self.lens[refid])
+        if left < 0:
+            lpad += left
+        return self.refs[refid][left:right], lpad, rpad
 
 
 class ReferencePicklable(Reference):

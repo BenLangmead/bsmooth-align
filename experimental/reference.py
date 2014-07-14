@@ -121,7 +121,7 @@ class Reference(object):
         return 0
     
     @abstractmethod
-    def get(self, refid, start, ln):
+    def get(self, refid, pos, ln, lpad, rpad):
         """ Return the length-'ln' substring beginning at offset
             'start' in the sequence named 'refid' """
         return ''
@@ -198,15 +198,14 @@ class ReferencePicklable(Reference):
         is specified but doesn't exist at first, we create it at the
         end. """
     
-    def __init__(self, fafns, pickleFn=None, verbose=False):
+    def __init__(self, fafns, pickleFn=None):
         self.refs, self.lens = {}, {}
-        pickleExists = False
+        pickle_exists = False
         if pickleFn is not None:
-            pickleExists = os.path.exists(pickleFn)
-        if pickleFn is not None and pickleExists:
+            pickle_exists = os.path.exists(pickleFn)
+        if pickleFn is not None and pickle_exists:
             self.load(pickleFn)
         else:
-            last_pt = 0
             abort = False
             for fafn in fafns:
                 with open(fafn, 'r') as fafh:
@@ -216,7 +215,8 @@ class ReferencePicklable(Reference):
                         ln = len(line)
                         if ln > 0 and line[0] == '>':
                             ind = line.find(" ")
-                            if ind == -1: ind = len(line)
+                            if ind == -1:
+                                ind = len(line)
                             line = line[1:ind]
                             name = line
                             self.refs[name] = []
@@ -225,10 +225,11 @@ class ReferencePicklable(Reference):
                             assert name is not None
                             self.refs[name].append(line)
                             self.lens[name] += ln
-                if abort: break
+                if abort:
+                    break
             for k in self.refs.iterkeys():
                 self.refs[k] = ''.join(self.refs[k])
-            if pickleFn is not None and not pickleExists:
+            if pickleFn is not None and not pickle_exists:
                 self.save(pickleFn)
     
     def __enter__(self):
@@ -253,12 +254,19 @@ class ReferencePicklable(Reference):
     def load(self, fn):
         self.refs, self.lens = load(open(fn, 'rb'))
     
-    def get(self, refid, pos, ln):
+    def get(self, refid, pos, ln, lpad, rpad):
         """ Return the specified substring of the reference """
         assert refid in self.refs
+        left, right = pos - lpad, pos + ln + rpad
         if pos + ln > self.lens[refid]:
-            raise ReferenceOOB('"%s" has length %d; tried to get [%d, %d)' % (refid, self.lens[refid], pos, pos+ln))
-        return self.refs[refid][pos:pos+ln]
+            raise RuntimeError('pos+ln=%d, len=%d' % (pos+ln, self.lens[refid]))
+        if pos < 0:
+            raise RuntimeError('pos=%d' % pos)
+        if right > self.lens[refid]:
+            rpad -= (right - self.lens[refid])
+        if left < 0:
+            lpad += left
+        return self.refs[refid][left:right], lpad, rpad
 
 
 class ReferenceIndexed(Reference):

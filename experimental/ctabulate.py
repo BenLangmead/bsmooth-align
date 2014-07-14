@@ -44,7 +44,7 @@ parser.add_argument('--fasta-index', dest='fa_idx', type=str, required=False,
                     help='Restore index of FASTA files from this file, or, if file doesn\'t yet exist, put the index '
                          'there so it can be used in future runs')
 parser.add_argument('--fasta-pickle', type=str, required=False,
-                    help='If not already present, store pickled copy of reference in given file.  ''
+                    help='If not already present, store pickled copy of reference in given file. '
                          'If pickle file is present, load from file, which is very quick.')
 parser.add_argument('--min-mapq', dest='min_mapq', action='store', type=int, default=20,
                     help='Read-level measurements with mapping quality (MAPQ) less than this threshold are filtered '
@@ -623,7 +623,10 @@ if args.loci is None and args.rand_loci is None:
 
 # Open the FASTA files in 
 print >> sys.stderr, 'Parsing FASTA files...'
-fa_idx = reference.ReferenceSimple(args.fasta)
+if args.pickle_fasta is not None:
+    fa_idx = reference.ReferencePicklable(args.fasta, args.pickle_fasta)
+else:
+    fa_idx = reference.ReferenceSimple(args.fasta)
 fa_sanity = dict()
 if args.sanity:
     from Bio import SeqIO

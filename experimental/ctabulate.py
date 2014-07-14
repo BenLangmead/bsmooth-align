@@ -43,6 +43,9 @@ parser.add_argument('--random-loci', metavar='SEED,NUM,LEN', dest='rand_loci', t
 parser.add_argument('--fasta-index', dest='fa_idx', type=str, required=False,
                     help='Restore index of FASTA files from this file, or, if file doesn\'t yet exist, put the index '
                          'there so it can be used in future runs')
+parser.add_argument('--fasta-pickle', type=str, required=False,
+                    help='If not already present, store pickled copy of reference in given file.  ''
+                         'If pickle file is present, load from file, which is very quick.')
 parser.add_argument('--min-mapq', dest='min_mapq', action='store', type=int, default=20,
                     help='Read-level measurements with mapping quality (MAPQ) less than this threshold are filtered '
                          'out')
@@ -472,7 +475,7 @@ def tab_ival(off,
     if lpad < npad:
         refstr = ('x' * (npad - lpad)) + refstr
     if rpad < npad:
-        refstr += ('x' * (npad - lpad))
+        refstr += ('x' * (npad - rpad))
     assert len(refstr) == ln + 2 * npad
 
     # Now calculate bisulfite strings

@@ -623,8 +623,8 @@ if args.loci is None and args.rand_loci is None:
 
 # Open the FASTA files in 
 print >> sys.stderr, 'Parsing FASTA files...'
-if args.pickle_fasta is not None:
-    fa_idx = reference.ReferencePicklable(args.fasta, args.pickle_fasta)
+if args.fasta_pickle is not None:
+    fa_idx = reference.ReferencePicklable(args.fasta, args.fasta_pickle)
 else:
     fa_idx = reference.ReferenceSimple(args.fasta)
 fa_sanity = dict()

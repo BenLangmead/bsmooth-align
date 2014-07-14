@@ -32,7 +32,7 @@ parser = argparse.ArgumentParser(description='Tabulate evidence at CpGs and/or n
 parser.add_argument('--fasta', metavar='path', dest='fasta', type=str, nargs='+', required=True,
                     help='FASTA file(s) containing reference genome sequences')
 parser.add_argument('--bsbam', metavar='path', dest='bsbam', type=str, nargs='+', required=True,
-                    help='Sorted BAM file(s) containing Bsmooth alignment ' 'output for bisulfite sequencing reads')
+                    help='Sorted BAM file(s) containing Bsmooth alignment output for bisulfite sequencing reads')
 parser.add_argument('--locus', metavar='chr:offset1-offset2', dest='loci', type=str, nargs='+', required=False,
                     help='Genome interval to tabulate.  If specified more than once, all specified intervals are '
                          'tabulated.')
@@ -727,11 +727,21 @@ def go():
                 last_chr = ch
 
 try:
-    if args.profile:
+    pr = None
+    if args['profile']:
         import cProfile
-        cProfile.run('go()')
-    else:
-        go()
+        import pstats
+        import StringIO
+        pr = cProfile.Profile()
+        pr.enable()
+    go()
+    if args['profile']:
+        pr.disable()
+        s = StringIO.StringIO()
+        sortby = 'tottime'
+        ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+        ps.print_stats(30)
+        print s.getvalue()
 except IOError, e:
     if e.errno == errno.EPIPE:
         pass  # EPIPE error; do nothing (don't print error message)

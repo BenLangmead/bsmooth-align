@@ -728,14 +728,14 @@ def go():
 
 try:
     pr = None
-    if args['profile']:
+    if args.profile:
         import cProfile
         import pstats
         import StringIO
         pr = cProfile.Profile()
         pr.enable()
     go()
-    if args['profile']:
+    if args.profile:
         pr.disable()
         s = StringIO.StringIO()
         sortby = 'tottime'

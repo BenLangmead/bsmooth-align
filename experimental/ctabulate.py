@@ -14,12 +14,12 @@ import pysam
 import sys
 import string
 import unittest
-import random
 import copy
 import site
 import errno
 import reference
 import logging
+from collections import defaultdict
 
 base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 pytrim_path = os.path.join(base_path, "modules", "btl")
@@ -27,9 +27,44 @@ site.addsitedir(pytrim_path)
 
 version = "1.0.0"
 
-parser = argparse.ArgumentParser(description='Tabulate evidence at CpGs and/or non-CpG Cs in a manner similar to'
-                                             'BSmooth\'s bsev_tabulate.pl script.  Operates on BSmooth sorted .bam'
-                                             'files.')
+parser = argparse.ArgumentParser(
+    description='''
+Tabulate evidence at CpGs and/or non-CpG Cs in a manner similar to
+BSmooth's bsev_tabulate.pl script.  Operates on SORTED BSmooth .bam
+files.  BSmooth does not sort them by default so you will generally
+have to run 'samtools sort' on the .watson.bam and .crick.bam files
+before using them with this tool.
+
+Also requires FASTA of the reference be available.  For large
+genomes, parsing the FASTA can be slow.  This can be accelerated by
+providing the --fasta-pickle option, which will cache a pickled copy
+of the FASTA file for faster loading.
+
+The output is tab-separated and consists of these columns.
+
+1. Chromosome name
+2. Offset (1-based)
+3. Strand (W=Watson, C=Crick)
+4. Methylated qualities; string with once character per base quality
+   value associated with a methylated piece of evidence at this
+   position.  Empty if there is no methylated evidence.
+5. Number of distinct sequencing cycles among all the methylated
+   pieces of evidence.
+6. Same as 4 but for unmethylated evidence.
+7. Same as 5 but for unmethylated evidence.
+8. Number of pieces of evidence filtered out because the sequencing
+   cycle is untrusted.  (TODO: add option to set this threshold)
+9. Number of pieces of evidence filtered out because the source read
+   is too short.  See --min-read-len.
+10. Number of pieces of evidence filtered out because the allele was
+    not a C or T.
+11. Number of pieces of evidence filtered out because the source
+    alignment's mapping quality (MAPQ) is too low.  See --min-mapq.
+12. Number of pieces of evidence filtered out because the base
+    quality is too low.  (TODO: add option to set this threshold)
+
+By default a header line is output, but this can be suppressed with
+--no-header.''', formatter_class=argparse.RawDescriptionHelpFormatter)
 
 parser.add_argument('--fasta', metavar='path', dest='fasta', type=str, nargs='+', required=True,
                     help='FASTA file(s) containing reference genome sequences')
@@ -38,9 +73,6 @@ parser.add_argument('--bsbam', metavar='path', dest='bsbam', type=str, nargs='+'
 parser.add_argument('--locus', metavar='chr:offset1-offset2', dest='loci', type=str, nargs='+', required=False,
                     help='Genome interval to tabulate.  If specified more than once, all specified intervals are '
                          'tabulated.')
-parser.add_argument('--random-loci', metavar='SEED,NUM,LEN', dest='rand_loci', type=str, nargs='+', required=False,
-                    help='Tabulate random genome intervals.  Pseudo-random generator is initialized with SEED, then '
-                         'NUM intervals of length LEN are chosen and tabulated.')
 parser.add_argument('--fasta-index', dest='fa_idx', type=str, required=False,
                     help='Restore index of FASTA files from this file, or, if file doesn\'t yet exist, put the index '
                          'there so it can be used in future runs')
@@ -94,8 +126,6 @@ _revcomp_trans = string.maketrans("ACGTacgt", "TGCAtgca")
 
 def revcomp(_x):
     return _x[::-1].translate(_revcomp_trans)
-
-import WeightedRandom
 
 
 def phred33c2i(c):
@@ -363,30 +393,26 @@ class BsSummary:
         self.nfilt_mapq += o.nfilt_mapq
         self.nfilt_baseq += o.nfilt_baseq
         self.ms += o.ms
-    
+
+    @staticmethod
+    def summary_header():
+        return 'mqual\tmcyc\tuqual\tucyc\tfilt_cy\tfilt_readlen\tfilt_non_ct\tfilt_mapq\tfilt_basequal'
+
     def summary(self, npad, strat_by=4):
         """ Summarize all the read-level measurements collected here """
-        r, q, c = dict(), dict(), dict()  # raw, by quality, by seq cycle
+        r = defaultdict(int)
+        q, c = defaultdict(lambda: defaultdict(int)), defaultdict(lambda: defaultdict(int))
         for m in self.ms:
             seq, qual, cy, wat, rc = m
             if wat != rc:
                 cy = -cy
-            r[seq] = r.get(seq, 0) + 1
-            if seq not in q:
-                q[seq] = dict()
-            q[seq][qual] = q[seq].get(qual, 0) + 1
-            if seq not in c:
-                c[seq] = dict()
-            c[seq][cy] = c[seq].get(cy, 0) + 1
-        ucyc, mcyc = 0, 0
-        if 'T' in c:
-            ucyc = len(c['T'])
-        if 'C' in c:
-            mcyc = len(c['C'])
+            r[seq] += 1
+            q[seq][qual] += 1
+            c[seq][cy] += 1
+        ucyc, mcyc = len(c['T']), len(c['C'])
         uq, mq = q.get('T', dict()), q.get('C', dict())
-        context = self.context
-        if context is None:
-            context = "(unknown)"
+        context = self.context or '(unknown)'
+        filts = [self.nfilt_cy, self.nfilt_rdl, self.nfilt_nuc, self.nfilt_mapq, self.nfilt_baseq]
         if strat_by is not None:
             us, ms = [], []
             for i in xrange(0, self.max_qual+2, strat_by):
@@ -396,16 +422,13 @@ class BsSummary:
                     m += mq.get(i+j, 0)
                 us.append(u)
                 ms.append(m)
-            ret = ms + [mcyc] + us + [ucyc] + \
-                  [self.nfilt_cy, self.nfilt_rdl, self.nfilt_nuc, self.nfilt_mapq, self.nfilt_baseq]
+            ret = ms + [mcyc] + us + [ucyc] + filts
             ret = map(str, ret)
             if npad > 0:
                 ret = [context] + ret
         else:
             ret = [''.join(map(phred33i2c, mq))] + [str(mcyc)] + \
-                  [''.join(map(phred33i2c, uq))] + [str(ucyc)] + \
-                  map(str, [self.nfilt_cy, self.nfilt_rdl, self.nfilt_nuc,
-                            self.nfilt_mapq, self.nfilt_baseq])
+                  [''.join(map(phred33i2c, uq))] + [str(ucyc)] + map(str, filts)
             if npad > 0:
                 ret = [context] + ret
         return ret
@@ -420,7 +443,7 @@ def print_summaries(oh, ref, summ_fw, summ_rc, npad, merge=True, head=False, str
     ignore = dict()
     for off in sorted(summ_fw.keys() + summ_rc.keys()):
         if head:
-            oh.write("ref\toff\tfw\t")
+            oh.write("ref\toff\tstrand\t%s\n" % BsSummary.summary_header())
             head = False
         if off in summ_fw:
             sm = copy.deepcopy(summ_fw[off])
@@ -727,45 +750,7 @@ def go():
                          filt_mapq=lambda _x: _x < args.min_mapq,
                          filt_rdl=lambda _x: _x < args.min_rdl,
                          just_cpg=not args.all_C)
-            print_summaries(sys.stdout, ch, summs_fw, summs_rc, args.npad, merge=args.merge, head=False)
-    
-    # Handle any random intervals that the caller requested
-    if args.rand_loci is not None:
-        for loc in args.rand_loci:
-            seed, num, ln = string.split(loc, ',')
-            seed, num, ln = int(seed), int(num), int(ln)
-            random.seed(seed)
-            fa_it = fa_idx.lens.items()
-            fa_v = map(lambda x: x[1], fa_it)
-            wgen = WeightedRandom.WeightedRandomGenerator(fa_v)
-            last_chr = None
-            seq, seq_pad = None, None
-            for i in xrange(0, num):
-                chrn = wgen.next()
-                ch = fa_it[chrn][0]
-                assert ch in fa_idx.lens
-                chrlen = fa_idx.lens[ch]
-                mylen = min(ln, chrlen)
-                chrlen -= (mylen-1)
-                assert chrlen >= 0
-                off = random.randint(0, 0+chrlen)
-                logging.info("Selected %s:%d-%d" % (ch, off, off+mylen))
-                # Load the reference sequence
-                if last_chr is not None and ch == last_chr:
-                    pass
-                else:
-                    seq = fa_idx.get(ch)
-                    seq_pad = ('x' * npad + seq + 'x' * npad)
-                summ, summs_fw, summs_rc = \
-                    tab_ival(off, mylen,
-                             lambda _x, _y: aln_get(ch, _x, _y),
-                             lambda _x, _y, _lpad, _rpad: seq_pad[_x+npad:_y+npad],
-                             args.npad,
-                             filt_mapq=lambda _x: _x < args.min_mapq,
-                             filt_rdl=lambda _x: _x < args.min_rdl,
-                             just_cpg=not args.all_C)
-                print_summaries(sys.stdout, ch, summs_fw, summs_rc, args.npad, merge=True, head=False)
-                last_chr = ch
+            print_summaries(sys.stdout, ch, summs_fw, summs_rc, args.npad, merge=args.merge, head=True)
 
 try:
     pr = None

@@ -497,7 +497,12 @@ def tab_ival(off,
     # For each BSmooth .bam file
     nrecs = 0
     mapqs, rdlens, wats = [], [], []
+    n, n_ival = 0, 1
     for rec in aln_get(off, off+ln):
+        n += 1
+        if n % n_ival == 0:
+            logging.debug('  Handled %d records')
+            n_ival = max(int(n_ival * 1.1 + 0.5), n_ival+1)
         pos, flag, wat, rc, cigar, alsc, mapq, seq, qual = rec
         if (flag & 4) != 0:
             # This can happen if this is an unmapped mate and the opposite

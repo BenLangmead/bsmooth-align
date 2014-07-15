@@ -503,7 +503,8 @@ def tab_ival(off,
     logging.info('  Parsing alignments')
     for rec in aln_get(off, off+ln):
         n += 1
-        if n % n_ival == 0:
+        assert n <= n_ival
+        if n == n_ival:
             logging.debug('    Parsed %d alignments')
             n_ival = max(int(n_ival * 1.1 + 0.5), n_ival+1)
         pos, flag, wat, rc, cigar, alsc, mapq, seq, qual = rec

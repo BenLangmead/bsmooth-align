@@ -550,6 +550,8 @@ def tab_ival(off,
         mapqs.append(mapq)
         rdlens.append(len(seq))
         wats.append(wat)
+
+    logging.info('  Parsed all %d alignments' % n)
     max_qual = 40
     # One big overall summary:
     summ = BsSummary(max_qual, filt_mapq=filt_mapq, filt_cy=filt_cy,

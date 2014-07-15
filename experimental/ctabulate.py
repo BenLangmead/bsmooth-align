@@ -47,26 +47,25 @@ parser.add_argument('--fasta-index', dest='fa_idx', type=str, required=False,
 parser.add_argument('--fasta-pickle', type=str, required=False,
                     help='If not already present, store pickled copy of reference in given file. '
                          'If pickle file is present, load from file, which is very quick.')
-parser.add_argument('--min-mapq', dest='min_mapq', action='store', type=int, default=20,
+parser.add_argument('--min-mapq', action='store', type=int, default=20,
                     help='Read-level measurements with mapping quality (MAPQ) less than this threshold are filtered '
                          'out')
 parser.add_argument('--min-read-len', dest='min_rdl', action='store', type=int, default=40,
                     help='Read-level measurements from reads with length less than this threshold are filtered out')
-parser.add_argument('--all-C', dest='all_c', action='store_const', const=True, default=False,
+parser.add_argument('--all-C', action='store_const', const=True, default=False,
                     help='Tabulate all Cs.  Default is to tabulate just CpG Cs')
-parser.add_argument('--context', dest='npad', action='store', type=int, default=0,
+parser.add_argument('--context', action='store', type=int, default=0,
                     help='When printing context for a site, print this many positions on either side')
-parser.add_argument('--merge', dest='merge', action='store_const', const=True, default=False,
+parser.add_argument('--merge', action='store_const', const=True, default=False,
                     help='Merge read-level measurements overlapping the C and G in a CpG before printing records.  '
                          'Records will have M in the type column, indicating the records are merged.')
-parser.add_argument('--sanity', dest='sanity', action='store_const', const=True, default=False,
+parser.add_argument('--sanity', action='store_const', const=True, default=False,
                     help='Do various sanity checks')
-parser.add_argument('--test', dest='test', action='store_const', const=True, default=False, help='Do unit tests')
-parser.add_argument('--profile', dest='profile', action='store_const', const=True, default=False,
+parser.add_argument('--test', action='store_const', const=True, default=False, help='Do unit tests')
+parser.add_argument('--profile', action='store_const', const=True, default=False,
                     help='Print profiling info')
-parser.add_argument('--verbose', dest='verbose', action='store_const', const=True, default=False, help='Be talkative')
-parser.add_argument('--version', dest='version', action='store_const', const=True, default=False,
-                    help='Print version and quit')
+parser.add_argument('--verbose', action='store_const', const=True, default=False, help='Be talkative')
+parser.add_argument('--version', action='store_const', const=True, default=False, help='Print version and quit')
 
 # FIXES FOR SAM ISSUES
 
@@ -81,13 +80,13 @@ parser.add_argument('--crick-cigar-rev', dest='cri_cigar_rev', action='store_con
 
 # Whether to reverse-comp the YO:Z field for reads with various combinations of
 # Watson/Crick forward/reverse-comp
-parser.add_argument('--rc-wat-fw', dest='rc_wat_fw', action='store_const', const=True, default=False,
+parser.add_argument('--rc-wat-fw', action='store_const', const=True, default=False,
                     help='Reverse complement YO:Z string for W-strand alignments')
-parser.add_argument('--rc-cri-fw', dest='rc_cri_fw', action='store_const', const=True, default=False,
+parser.add_argument('--rc-cri-fw', action='store_const', const=True, default=False,
                     help='Reverse complement YO:Z string for C-strand alignments')
-parser.add_argument('--rc-wat-rc', dest='rc_wat_rc', action='store_const', const=True, default=False,
+parser.add_argument('--rc-wat-rc', action='store_const', const=True, default=False,
                     help='Reverse complement YO:Z string for WR-strand alignments')
-parser.add_argument('--rc-cri-rc', dest='rc_cri_rc', action='store_const', const=True, default=False,
+parser.add_argument('--rc-cri-rc', action='store_const', const=True, default=False,
                     help='Reverse complement YO:Z string for CR-strand alignments')
 
 _revcomp_trans = string.maketrans("ACGTacgt", "TGCAtgca")
@@ -621,6 +620,9 @@ args = parser.parse_args()
 if args.loci is None and args.rand_loci is None:
     raise RuntimeError("Neither --locus nor --random-loci specified")
 
+logging.basicConfig(format='%(asctime)s:%(levelname)s:%(message)s', datefmt='%m/%d/%y-%H:%M:%S',
+                    level=logging.DEBUG if args.verbose else logging.INFO)
+
 # Open the FASTA files in 
 logging.info('Parsing FASTA files...')
 if args.fasta_pickle is not None:
@@ -685,9 +687,6 @@ def aln_get(ref, off1, off2):
 
 
 def go():
-    logging.basicConfig(format='%(asctime)s:%(levelname)s:%(message)s', datefmt='%m/%d/%y-%H:%M:%S',
-                        level=logging.DEBUG if args.verbose else logging.INFO)
-
     # Handle the intervals specified by the caller
     if args.loci is not None:
         logging.info('Handling intervals specified by caller...')

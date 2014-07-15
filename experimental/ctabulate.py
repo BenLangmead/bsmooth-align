@@ -707,7 +707,7 @@ def go():
                          fa_idx.length(ch),
                          filt_mapq=lambda _x: _x < args.min_mapq,
                          filt_rdl=lambda _x: _x < args.min_rdl,
-                         just_cpg=not args.all_c)
+                         just_cpg=not args.all_C)
             print_summaries(sys.stdout, ch, summs_fw, summs_rc, args.npad, merge=args.merge, head=False)
     
     # Handle any random intervals that the caller requested
@@ -744,7 +744,7 @@ def go():
                              fa_idx.length(ch),
                              filt_mapq=lambda _x: _x < args.min_mapq,
                              filt_rdl=lambda _x: _x < args.min_rdl,
-                             just_cpg=not args.all_c)
+                             just_cpg=not args.all_C)
                 print_summaries(sys.stdout, ch, summs_fw, summs_rc, args.npad, merge=True, head=False)
                 last_chr = ch
 

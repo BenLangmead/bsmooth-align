@@ -54,7 +54,7 @@ parser.add_argument('--min-read-len', dest='min_rdl', action='store', type=int, 
                     help='Read-level measurements from reads with length less than this threshold are filtered out')
 parser.add_argument('--all-C', action='store_const', const=True, default=False,
                     help='Tabulate all Cs.  Default is to tabulate just CpG Cs')
-parser.add_argument('--context', action='store', type=int, default=0,
+parser.add_argument('--context', dest='npad', action='store', type=int, default=0,
                     help='When printing context for a site, print this many positions on either side')
 parser.add_argument('--merge', action='store_const', const=True, default=False,
                     help='Merge read-level measurements overlapping the C and G in a CpG before printing records.  '
@@ -396,7 +396,7 @@ class BsSummary:
                     m += mq.get(i+j, 0)
                 us.append(u)
                 ms.append(m)
-            ret = ms + [mcyc] + us + [ucyc] +\
+            ret = ms + [mcyc] + us + [ucyc] + \
                   [self.nfilt_cy, self.nfilt_rdl, self.nfilt_nuc, self.nfilt_mapq, self.nfilt_baseq]
             ret = map(str, ret)
             if npad > 0:
@@ -468,11 +468,12 @@ def tab_ival(off,
 
     # need a clear expectation about what this function should do if
     # our requested bounds fall off the end of the reference sequence.
-    logging.info('  Retrieving reference sequence')
+    logging.info('  Retrieving reference sequence at %d:%d +- %d' % (off, off+ln, npad))
+    assert ln > 0
     refstr, lpad, rpad = fa_get(off, ln, npad, npad)
     assert lpad <= npad
     assert rpad <= npad
-    assert len(refstr) == ln + lpad + rpad
+    assert len(refstr) == ln + lpad + rpad, '%d != %d + %d + %d' % (len(refstr), ln, lpad, rpad)
     if lpad < npad:
         refstr = ('x' * (npad - lpad)) + refstr
     if rpad < npad:
@@ -559,29 +560,35 @@ def tab_ival(off,
     summs_wat, summs_cri = dict(), dict()
     assert len(refstr_wat) >= ln, (len(refstr_wat), ln)
     assert len(refstr_cri) >= ln
+
+    logging.info('  Iterating over %d columns' % ln)
     for j in xrange(0, ln):
+        logging.debug('    Column %d' % j)
         pos = off + j  # offset into refstr_trimmed / refstr_wat / refstr_cri
-        ev_wat = refstr_wat[j].upper() == 'Y'
-        ev_cri = refstr_cri[j].upper() == 'R'
+        chr_wat = refstr_wat[j].upper()
+        chr_cri = refstr_cri[j].upper()
+        ev_wat = chr_wat == 'Y'
+        ev_cri = chr_cri == 'R'
         context = refstr[j:j+2*npad+1]
         if ev_wat or ev_cri:
             # Go down the column in the multi-alignment and tabulate all the
             # evidence for this position
-            if ev_wat:
-                summs_wat[pos] = BsSummary(max_qual,
-                                           filt_mapq=filt_mapq,
-                                           filt_cy=filt_cy,
-                                           filt_baseq=filt_baseq,
-                                           filt_rdl=filt_rdl,
-                                           context=context)
-            if ev_cri:
-                summs_cri[pos] = BsSummary(max_qual,
-                                           filt_mapq=filt_mapq,
-                                           filt_cy=filt_cy,
-                                           filt_baseq=filt_baseq,
-                                           filt_rdl=filt_rdl,
-                                           context=context)
             if pos in mul:
+                logging.debug('      has evidence')
+                if ev_wat:
+                    summs_wat[pos] = BsSummary(max_qual,
+                                               filt_mapq=filt_mapq,
+                                               filt_cy=filt_cy,
+                                               filt_baseq=filt_baseq,
+                                               filt_rdl=filt_rdl,
+                                               context=context)
+                if ev_cri:
+                    summs_cri[pos] = BsSummary(max_qual,
+                                               filt_mapq=filt_mapq,
+                                               filt_cy=filt_cy,
+                                               filt_baseq=filt_baseq,
+                                               filt_rdl=filt_rdl,
+                                               context=context)
                 for i in xrange(0, nrecs):
                     if (wats[i] and ev_wat) or (not wats[i] and ev_cri):
                         if len(mul[pos]) > i and mul[pos][i] is not None:
@@ -712,10 +719,11 @@ def go():
             ln = off2 - off1
             off1 -= 1
             summ, summs_fw, summs_rc = \
-                tab_ival(off1, ln,
+                tab_ival(off1,
+                         ln,
                          lambda _x, _y: aln_get(ch, _x, _y),
-                         lambda _x, _y, _lpad, _rpad: fa_idx.get(ch, _x, _y-_x, _lpad, _rpad),
-                         fa_idx.length(ch),
+                         lambda _x, _y, _lpad, _rpad: fa_idx.get(ch, _x, _y, _lpad, _rpad),
+                         args.npad,
                          filt_mapq=lambda _x: _x < args.min_mapq,
                          filt_rdl=lambda _x: _x < args.min_rdl,
                          just_cpg=not args.all_C)
@@ -752,7 +760,7 @@ def go():
                     tab_ival(off, mylen,
                              lambda _x, _y: aln_get(ch, _x, _y),
                              lambda _x, _y, _lpad, _rpad: seq_pad[_x+npad:_y+npad],
-                             fa_idx.length(ch),
+                             args.npad,
                              filt_mapq=lambda _x: _x < args.min_mapq,
                              filt_rdl=lambda _x: _x < args.min_rdl,
                              just_cpg=not args.all_C)

@@ -19,6 +19,7 @@ import copy
 import site
 import errno
 import reference
+import logging
 
 base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 pytrim_path = os.path.join(base_path, "modules", "btl")
@@ -498,7 +499,6 @@ def tab_ival(off,
     nrecs = 0
     mapqs, rdlens, wats = [], [], []
     for rec in aln_get(off, off+ln):
-        #print rec
         pos, flag, wat, rc, cigar, alsc, mapq, seq, qual = rec
         if (flag & 4) != 0:
             # This can happen if this is an unmapped mate and the opposite
@@ -536,8 +536,8 @@ def tab_ival(off,
                         rdstr += seq
                         rfstr += refc
             frac = 1.0 * nma / npos
-            print "Strand=%s, fraction matchup=%0.3f, %s, %d\nrdstr:   %s\nrfstr:   %s\nrfstr_c: %s" % \
-                (strn, frac, str(cigar), alsc, rdstr, rfstr, rfstr_c)
+            logging.info("Strand=%s, fraction matchup=%0.3f, %s, %d\nrdstr:   %s\nrfstr:   %s\nrfstr_c: %s" % \
+                (strn, frac, str(cigar), alsc, rdstr, rfstr, rfstr_c))
         nrecs += 1
         mapqs.append(mapq)
         rdlens.append(len(seq))
@@ -622,7 +622,7 @@ if args.loci is None and args.rand_loci is None:
     raise RuntimeError("Neither --locus nor --random-loci specified")
 
 # Open the FASTA files in 
-print >> sys.stderr, 'Parsing FASTA files...'
+logging.info('Parsing FASTA files...')
 if args.fasta_pickle is not None:
     fa_idx = reference.ReferencePicklable(args.fasta, args.fasta_pickle)
 else:
@@ -636,10 +636,10 @@ if args.sanity:
         fa_sanity.update(tmp)
 
 # Index the BAM files if needed
-print >> sys.stderr, 'Opening and indexing BSmooth BAM files...'
+logging.info('Opening and indexing BSmooth BAM files...')
 for bm in args.bsbam:
     if not os.path.exists(bm + ".bai"):
-        print >> sys.stderr, 'Indexing BAM file "%s" ... ' % bm
+        logging.info('Indexing BAM file "%s" ... ' % bm)
         disp = pysam.SamtoolsDispatcher("index", None)
         disp(bm)
 
@@ -685,9 +685,14 @@ def aln_get(ref, off1, off2):
 
 
 def go():
+    logging.basicConfig(format='%(asctime)s:%(levelname)s:%(message)s', datefmt='%m/%d/%y-%H:%M:%S',
+                        level=logging.DEBUG if args['verbose'] else logging.INFO)
+
     # Handle the intervals specified by the caller
     if args.loci is not None:
+        logging.info('Handling intervals specified by caller...')
         for loc in args.loci:
+            logging.info('  %s' % loc)
             ch, off = string.split(loc, ':')
             off1, off2 = string.split(off, '-')
             off1, off2 = int(off1), int(off2)
@@ -726,7 +731,7 @@ def go():
                 chrlen -= (mylen-1)
                 assert chrlen >= 0
                 off = random.randint(0, 0+chrlen)
-                print >> sys.stderr, "Selected %s:%d-%d" % (ch, off, off+mylen)
+                logging.info("Selected %s:%d-%d" % (ch, off, off+mylen))
                 # Load the reference sequence
                 if last_chr is not None and ch == last_chr:
                     pass

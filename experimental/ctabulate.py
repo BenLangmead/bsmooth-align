@@ -686,7 +686,7 @@ def aln_get(ref, off1, off2):
 
 def go():
     logging.basicConfig(format='%(asctime)s:%(levelname)s:%(message)s', datefmt='%m/%d/%y-%H:%M:%S',
-                        level=logging.DEBUG if args['verbose'] else logging.INFO)
+                        level=logging.DEBUG if args.verbose else logging.INFO)
 
     # Handle the intervals specified by the caller
     if args.loci is not None:

@@ -468,6 +468,7 @@ def tab_ival(off,
 
     # need a clear expectation about what this function should do if
     # our requested bounds fall off the end of the reference sequence.
+    logging.info('  Retrieving reference sequence')
     refstr, lpad, rpad = fa_get(off, ln, npad, npad)
     assert lpad <= npad
     assert rpad <= npad
@@ -479,6 +480,7 @@ def tab_ival(off,
     assert len(refstr) == ln + 2 * npad
 
     # Now calculate bisulfite strings
+    logging.info('  Bisulfite converting reference sequence')
     refstr_wat = refstr.replace('CG', 'YG')
     refstr_wat = refstr_wat.replace('C', 'T' if just_cpg else 'Y')
     refstr_cri = refstr.replace('CG', 'CR')
@@ -498,10 +500,11 @@ def tab_ival(off,
     nrecs = 0
     mapqs, rdlens, wats = [], [], []
     n, n_ival = 0, 1
+    logging.info('  Parsing alignments')
     for rec in aln_get(off, off+ln):
         n += 1
         if n % n_ival == 0:
-            logging.debug('  Handled %d records')
+            logging.debug('    Parsed %d alignments')
             n_ival = max(int(n_ival * 1.1 + 0.5), n_ival+1)
         pos, flag, wat, rc, cigar, alsc, mapq, seq, qual = rec
         if (flag & 4) != 0:

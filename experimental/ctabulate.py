@@ -82,6 +82,12 @@ parser.add_argument('--fasta-pickle', type=str, required=False,
 parser.add_argument('--min-mapq', action='store', type=int, default=20,
                     help='Read-level measurements with mapping quality (MAPQ) less than this threshold are filtered '
                          'out')
+parser.add_argument('--min-cyc', action='store', type=int, default=0,
+                    help='Read-level measurements with sequencing cycle < this offset are filtered out')
+parser.add_argument('--max-cyc', action='store', type=int, default=float('inf'),
+                    help='Read-level measurements with sequencing cycle > this are filtered out')
+parser.add_argument('--min-baseq', action='store', type=int, default=0,
+                    help='Read-level measurements with base quality < this are filtered out')
 parser.add_argument('--min-read-len', dest='min_rdl', action='store', type=int, default=40,
                     help='Read-level measurements from reads with length less than this threshold are filtered out')
 parser.add_argument('--all-C', action='store_const', const=True, default=False,
@@ -98,6 +104,7 @@ parser.add_argument('--profile', action='store_const', const=True, default=False
                     help='Print profiling info')
 parser.add_argument('--verbose', action='store_const', const=True, default=False, help='Be talkative')
 parser.add_argument('--version', action='store_const', const=True, default=False, help='Print version and quit')
+
 
 # FIXES FOR SAM ISSUES
 
@@ -129,10 +136,12 @@ def revcomp(_x):
 
 
 def phred33c2i(c):
+    """ Convert Phred+33 character to Q = -10 * log10 p """
     return ord(c) - 33
 
 
 def phred33i2c(i):
+    """ Convert Q = -10 * log10 p to Phred+33 character """
     return chr(i + 33)
 
 
@@ -156,12 +165,12 @@ def parse(pos, wat, rc, cigars, seq, qual, i, mul, qual_conv=phred33c2i):
     
     assert cigars is not None
 
-    def ensure_mul(refoff, j):
-        if refoff not in mul:
-            mul[refoff] = []
-        if len(mul[refoff]) <= j:
-            diff = j - len(mul[refoff]) + 1
-            mul[refoff] += [None] * diff
+    def ensure_mul(_refoff, _j):
+        if _refoff not in mul:
+            mul[_refoff] = []
+        if len(mul[_refoff]) <= _j:
+            diff = _j - len(mul[_refoff]) + 1
+            mul[_refoff] += [None] * diff
     
     assert pos >= 0
     last_op = -1
@@ -169,7 +178,7 @@ def parse(pos, wat, rc, cigars, seq, qual, i, mul, qual_conv=phred33c2i):
     refoff, rdoff = pos, 0
     refoff_min, refoff_max = sys.maxint, 0
     
-    left5 = wat == rc
+    left5 = wat != rc
     
     # Operations (in order of op id): MIDNSHP
     for c in cigars:
@@ -215,13 +224,13 @@ class TestParse(unittest.TestCase):
         mul = dict()
         pos = 7
         wat = True
-        fw = True
+        rc = False
         cigars = [(0, 10)]  # 10M
         seq = "GCATGCAACT"
-        qual = "IIIIIIIIII"
-        #       0123456789
-        #       7890123456
-        parse(pos, wat, fw, cigars, seq, qual, 0, mul)
+        qul = "IIIIIIIIII"
+        #      0123456789
+        #      7890123456
+        parse(pos, wat, rc, cigars, seq, qul, 0, mul)
         
         self.assertTrue(0 not in mul)
         self.assertTrue(6 not in mul)
@@ -238,9 +247,8 @@ class TestParse(unittest.TestCase):
         self.assertEqual(9,   mul[16][0][2])
         
         # Try backwards version of above
-        
-        fw = False
-        parse(pos, wat, fw, cigars, seq, qual, 1, mul)
+        rc = True
+        parse(pos, wat, rc, cigars, seq, qul, 1, mul)
         
         self.assertEqual(2,   len(mul[7]))
         self.assertEqual('G', mul[7][1][0])
@@ -256,7 +264,7 @@ class TestParse(unittest.TestCase):
         cigars = [(4, 2), (0, 7), (4, 1)]  # 10M
         if len(cigars) > 0 and cigars[0][0] == 4:
             pos += cigars[0][1]
-        parse(pos, wat, fw, cigars, seq, qual, 2, mul)
+        parse(pos, wat, rc, cigars, seq, qul, 2, mul)
         
         self.assertEqual(2,   len(mul[7]))
         self.assertEqual(2,   len(mul[8]))
@@ -269,7 +277,7 @@ class TestParse(unittest.TestCase):
         mul = dict()
         pos = 16
         wat = True
-        fw = True
+        rc = False
         cigars = [(0, 4), (1, 1), (0, 1), (2, 1), (0, 4)]  # 4M1I1M1D4M
         seq = "GCATGCAACN"
         qual = "ABCDEFGHIJ"
@@ -280,7 +288,7 @@ class TestParse(unittest.TestCase):
         #       012345-6789
         #       789012-3456
         #       MMMMIMDMMMM
-        parse(pos, wat, fw, cigars, seq, qual, 0, mul)
+        parse(pos, wat, rc, cigars, seq, qual, 0, mul)
         
         self.assertTrue(15 not in mul)
         self.assertTrue(16 in mul)
@@ -360,19 +368,19 @@ class BsSummary:
     def add(self, seq, qual, wat, rc, cy, rdlen, mapq):
         """ Add a read-level measurement """
         filt = False
-        if self.filt_cy is not None and self.filt_cy(cy):
+        if self.filt_cy is not None and self.filt_cy(cy):  # cycle filter
             self.nfilt_cy += 1
             filt = True
-        elif self.filt_rdl is not None and self.filt_rdl(rdlen):
+        elif self.filt_rdl is not None and self.filt_rdl(rdlen):  # read length filter
             self.nfilt_rdl += 1
             filt = True
-        elif self.filt_nuc is not None and self.filt_nuc(seq, wat):
+        elif self.filt_nuc is not None and self.filt_nuc(seq, wat):  # allele filter
             self.nfilt_nuc += 1
             filt = True
-        elif self.filt_mapq is not None and self.filt_mapq(mapq):
+        elif self.filt_mapq is not None and self.filt_mapq(mapq):  # MAPQ filter
             self.nfilt_mapq += 1
             filt = True
-        elif self.filt_baseq is not None and self.filt_baseq(qual):
+        elif self.filt_baseq is not None and self.filt_baseq(qual):  # base quality filter
             self.nfilt_baseq += 1
             filt = True
         qu = qual if qual <= self.max_qual else self.max_qual+1
@@ -459,38 +467,19 @@ def print_summaries(oh, ref, summ_fw, summ_rc, npad, merge=True, head=False, str
             oh.write("%s\t%d\tC\t%s\n" % (ref, off+1, "\t".join(sm)))
 
 
-def tab_ival(off,
-             ln,
-             aln_get,
-             fa_get,
-             npad,
-             just_cpg=True,
-             filt_cy=lambda _: False,
-             filt_mapq=lambda _: False,
-             filt_baseq=lambda _: False,
-             filt_rdl=lambda _: False,
+def tab_ival(off,  # reference offset
+             ln,  # length of ref interval to tabulate
+             aln_get,  # alignment getter
+             fa_get,  # reference getter
+             npad,  # amount fo pad when getting reference
+             just_cpg=True,  # whether to convert just CpGs or all Cs to wildcards
+             filt_cy=lambda _: False,  # cycle filter
+             filt_mapq=lambda _: False,  # MAPQ filter
+             filt_baseq=lambda _: False,  # base quality filter
+             filt_rdl=lambda _: False,  # read length filter
              sanity=False,
              verbose=False):
 
-    # TODO: is the purpose of the padding just so we don't miss a CpG
-    # at the edge of a substring?  Does the padding ever need to be >1?
-
-    """ For each CpG (and possibly each C) locus, tabulate the read-level
-        measurements overlapping the locus.
-        
-        ref:      reference string ID
-        off:      reference offset, 0-based
-        ln:       length of reference interval to tabulate
-        bsbams:   pysam Samfile objects for each BSmooth .bam file
-        fa_idx:   indexed FASTA for reference strings
-        just_cpg: True -> just tabulate CpGs, False -> all Cs
-        
-        aln_get retrieves records, where each record is like:
-        - 
-        """
-
-    # need a clear expectation about what this function should do if
-    # our requested bounds fall off the end of the reference sequence.
     logging.info('  Retrieving reference sequence at %d:%d +- %d' % (off, off+ln, npad))
     assert ln > 0
     refstr, lpad, rpad = fa_get(off, ln, npad, npad)
@@ -628,25 +617,44 @@ def tab_ival(off,
 class TestTabIval(unittest.TestCase):
     
     def test_tab_ival_1(self):
-        pos = 7
-        flag = 0
-        fw = True
-        wat = True
-        flag |= 16 if fw else 0
+        """ Some test cases for """
+        pos, flag = 1, 0
+        fw, wat = True, True
+        flag |= 0 if fw else 16
         cigars = [(4, 1), (0, 10)]  # 1S10M
         mapq = 40
         alsc = 30
-        refseq = "AGCATGCAACT"  # 3 Cs, 2 Gs, no CpGs
+        rfseq = "AGCATGCAACT"  # 3 Cs, 2 Gs, no CpGs
         rdseq = "AGCATGCAACT"
-        rdqual = "IIIIIIIIIII"
-        recs = [(pos, flag, wat, not fw, cigars, alsc, mapq, rdseq, rdqual)]
-        summ, summs_fw, summs_rc = tab_ival(1, 9, lambda _x, y: recs,
-                                            lambda _x, _y, _lpad, _rpad: (refseq[_x:_x+_y], 0, 0), 0, True)
+        rdqul = "IIIIIIIIIII"
+        recs = [(pos, flag, wat, not fw, cigars, alsc, mapq, rdseq, rdqul)]
+        summ, summs_fw, summs_rc = tab_ival(1,  # ref off
+                                            9,  # ref ival len
+                                            lambda _x, y: recs,  # aln_get
+                                            lambda _x, _y, _lpad, _rpad: (rfseq[_x:_x+_y], 0, 0),  # fa_get
+                                            0,  # npad
+                                            just_cpg=True)
         self.assertEqual(0, len(summs_fw.keys()))
         self.assertEqual(0, len(summs_rc.keys()))
-        summ, summs_fw, summs_rc = tab_ival(1, 9, lambda _x, y: recs,
-                                            lambda _x, _y, _lpad, _rpad: (refseq[_x:_x+_y], 0, 0), 0, False)
+        summ, summs_fw, summs_rc = tab_ival(1,  # off
+                                            9,  # len
+                                            lambda _x, y: recs,  # aln_get
+                                            lambda _x, _y, _lpad, _rpad: (rfseq[_x:_x+_y], 0, 0),  # fa_get
+                                            0,  # npad
+                                            just_cpg=False)
         self.assertEqual(3, len(summs_fw.keys()))
+        self.assertEqual(2, len(summs_rc.keys()))
+        summ, summs_fw, summs_rc = tab_ival(1,  # off
+                                            9,  # len
+                                            lambda _x, y: recs,  # aln_get
+                                            lambda _x, _y, _lpad, _rpad: (rfseq[_x:_x+_y], 0, 0),  # fa_get
+                                            0,  # npad
+                                            just_cpg=False,
+                                            filt_cy=lambda _x: _x > 2)
+        self.assertEqual(3, len(summs_fw.keys()))
+        self.assertEqual(1, len(summs_fw[2].ms))
+        self.assertEqual(1, summs_fw[6].nfilt_cy)
+        self.assertEqual(1, summs_fw[9].nfilt_cy)
         self.assertEqual(2, len(summs_rc.keys()))
 
 if sys.argv[-1] == "--test":
@@ -695,9 +703,9 @@ def aln_get(ref, off1, off2):
         interval """
     for f in bsbams:
         for rec in f.fetch(ref, off1, off2):
-            seq = rec.opt('YO')
+            seq = rec.opt('YO')  # get original sequence
             assert seq is not None, str(rec)
-            ori = rec.opt('XB')
+            ori = rec.opt('XB')  # get original orientation
             wat, rc = False, False
             # Parse Watson/Crick and forward/reverse-comp
             if ori is not None and ori[0] == 'W':
@@ -747,9 +755,11 @@ def go():
                          lambda _x, _y: aln_get(ch, _x, _y),
                          lambda _x, _y, _lpad, _rpad: fa_idx.get(ch, _x, _y, _lpad, _rpad),
                          args.npad,
-                         filt_mapq=lambda _x: _x < args.min_mapq,
-                         filt_rdl=lambda _x: _x < args.min_rdl,
-                         just_cpg=not args.all_C)
+                         filt_mapq=lambda _x: _x < args.min_mapq,  # MAPQ filter
+                         filt_rdl=lambda _x: _x < args.min_rdl,  # read length filter
+                         filt_cy=lambda _x: _x < args.min_cyc or _x > args.max_cyc,  # cycle filter
+                         filt_baseq=lambda _x: _x < args.min_baseq,  # base quality filter
+                         just_cpg=not args.all_C)  # whether to look for CpG vs. C meth
             print_summaries(sys.stdout, ch, summs_fw, summs_rc, args.npad, merge=args.merge, head=True)
 
 try:

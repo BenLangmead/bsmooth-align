@@ -22,6 +22,7 @@
 
 #include <utility>
 #include <algorithm>
+#include <memory>
 #include "threading.h"
 #include "ds.h"
 
@@ -250,7 +251,7 @@ void workingListParallelSort(const EList<std::pair<T*,T*> >& ps,
 	using namespace std;
 	typedef EList<WorkingListSortThread<T> > SortThreadVec;
 	size_t cur = 0;
-	auto_ptr<MUTEX_T> wlpsLock(new MUTEX_T);
+	std::auto_ptr<MUTEX_T> wlpsLock(new MUTEX_T);
 	MUTEX_INIT(*wlpsLock.get());
 	assert_geq(nt, 1);
 	auto_ptr<SortThreadVec> wlpsThreads(new SortThreadVec());

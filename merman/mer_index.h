@@ -23,6 +23,7 @@
 #include <string>
 #include <algorithm>
 #include <utility>
+#include <climits>
 #include "alphabet.h"
 #include "mer_ent.h"
 #include "read.h"

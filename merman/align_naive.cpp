@@ -18,6 +18,7 @@
  */
 
 #include <utility>
+#include <climits>
 #include "align_naive.h"
 #include "read.h"
 #include "ref.h"

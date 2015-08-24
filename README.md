@@ -5,6 +5,7 @@ This is a fork of [BSmooth](https://github.com/BenLangmead/bsmooth-align) by
 Kasper D. Hansen, Ben Langmead, and Rafael A. Irizarry. The fork fixes some
 problems which prevented the merman aligner from compiling.
 
+---
 
 BSmooth is by Kasper D. Hansen, Ben Langmead, Rafael A. Irizarry
 

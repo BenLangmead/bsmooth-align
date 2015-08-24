@@ -24,6 +24,7 @@
 #include <iostream>
 #include <algorithm>
 #include <ctype.h>
+#include <cstring>
 #include "alphabet.h"
 #include "assert_helpers.h"
 
@@ -489,7 +490,7 @@ static inline const char * sstr_to_cstr(const T& s) {
 }
 
 template<>
-static inline const char * sstr_to_cstr<std::basic_string<char> >(
+/*static*/ inline const char * sstr_to_cstr<std::basic_string<char> >(
 	const std::basic_string<char>& s)
 {
 	return s.c_str();

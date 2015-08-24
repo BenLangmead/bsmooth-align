@@ -100,7 +100,7 @@ PTHREAD_LIB = -lpthreadGC2
 PTHREAD_PKG = pthreadGC2.dll
 else
 # There's also -pthread, but that only seems to work on Linux
-PTHREAD_LIB = -lpthread
+PTHREAD_LIB = -pthread
 endif
 endif
 

@@ -24,6 +24,7 @@
 #include <stdexcept>
 #include <stdio.h>
 #include <stdint.h>
+#include <cstring>
 #include "assert_helpers.h"
 
 /**
@@ -412,7 +413,7 @@ public:
 				cur_ = len;
 			}
 		} else {
-			memcpy(&buf_[cur_], s, len);
+			std::memcpy(&buf_[cur_], s, len);
 			cur_ += len;
 		}
 		assert_leq(cur_, BUF_SZ);

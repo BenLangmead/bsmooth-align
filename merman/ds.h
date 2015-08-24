@@ -21,6 +21,8 @@
 #define DS_H_
 
 #include <stdexcept>
+#include <algorithm>
+#include <cstring>
 #include "assert_helpers.h"
 
 /**
@@ -876,11 +878,11 @@ private:
 		K* ktmp = new K[newsz];
 		V* vtmp = new V[newsz];
 		if(list_ != NULL) {
-			memcpy(ktmp, list_, cur_ * sizeof(K));
+			std::memcpy(ktmp, list_, cur_ * sizeof(K));
 			delete[] list_;
 		}
 		if(vals_ != NULL) {
-			memcpy(vtmp, vals_, cur_ * sizeof(V));
+			std::memcpy(vtmp, vals_, cur_ * sizeof(V));
 			delete[] vals_;
 		}
 		list_ = ktmp;
